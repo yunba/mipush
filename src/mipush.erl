@@ -189,8 +189,10 @@ disconnect(ConnId) -> mipush_connection:stop(ConnId).
 push_to_regid(ConnID, RegIDs = [_|_], PushMsg, ReturnType) ->
   NewPushMsg = maps:remove(type, PushMsg),
   MsgType = maps:get(type, PushMsg),
-  Query = NewPushMsg#{registration_id => join(RegIDs, ", ")},
-  Req = {"POST", MsgType, mipush_connection:build_request(?REGID_PUSH_URL, Query)},
+  NewPushMsg2 = maps:remove(auth, NewPushMsg),
+  Auth = maps:get(auth, NewPushMsg),
+  Query = NewPushMsg2#{registration_id => join(RegIDs, ", ")},
+  Req = {"POST", MsgType, mipush_connection:build_request(?REGID_PUSH_URL, Query), Auth},
   Result = mipush_connection:send_message(ConnID, Req, ReturnType),
   simplify_to_result(Result).
 

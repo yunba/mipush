@@ -25,7 +25,7 @@ stop(ConnId) -> gen_server:cast(ConnId, stop).
 
 -spec send_message(pid(), mipush:push_msg(), return|no_return) -> ok.
 send_message(ConnId, Msg, no_return) -> gen_server:cast(ConnId, Msg);
-send_message(ConnId, Msg, return) -> gen_server:call(ConnId, Msg).
+send_message(ConnId, Msg, return) -> gen_server:call(ConnId, Msg, infinity).
 
 -spec start_link(atom(), apns:connection()) -> {ok, pid()} | {error, {already_started, pid()}}.
 start_link(Name, Connection) ->
@@ -66,17 +66,16 @@ handle_call(Msg, From, State = #{socket := undefined, expires := Expires, timeou
     _: ErrReason -> {stop, ErrReason}
   end;
 
-handle_call({Method, MsgType, Query} = Req, From, State = #{socket := Socket, host := Host,
-  android_auth_key := AndroidAuth, ios_auth_key := IOSAuth,
-  android_reg_package_name := AndroidPackageName, ios_bundle_id := IOSBundleId,
+handle_call({Method, _MsgType, Query, Auth} = Req, From, State = #{socket := Socket, host := Host,
+%%  android_auth_key := AndroidAuth, ios_auth_key := IOSAuth,
+%%  android_reg_package_name := AndroidPackageName, ios_bundle_id := IOSBundleId,
   expires := Expires, expires_conn := ExpiresConn}) ->
   case ExpiresConn =< epoch(0) of
     true ->
       ssl:close(Socket),
       handle_call(Req, From, State#{socket => undefined});
     false ->
-      {Auth, NewQuery} = get_auth_and_query(MsgType, AndroidAuth, IOSAuth, AndroidPackageName, IOSBundleId, Query),
-      case do_send_recv_data(Socket, Method, NewQuery, Host, Auth) of
+      case do_send_recv_data(Socket, Method, Query, Host, Auth) of
         {reply, Data} ->
           NewData = re:replace(Data, <<"\r\n\.+\r\n">>, <<"">>, [global, {return, binary}]),
           DataList = binary:split(NewData, [<<",">>], [global]),
@@ -99,17 +98,16 @@ handle_cast(Msg, State = #{socket := undefined, expires := Expires, timeout := T
     _: ErrReason -> {stop, ErrReason}
   end;
 handle_cast(stop, State) -> {stop, normal, State};
-handle_cast({Method, MsgType, Query}, State = #{socket := Socket, host := Host,
-  android_auth_key := AndroidAuth, ios_auth_key := IOSAuth,
-  android_reg_package_name := AndroidPackageName, ios_bundle_id := IOSBundleId,
+handle_cast({Method, _MsgType, Query, Auth}, State = #{socket := Socket, host := Host,
+%%  android_auth_key := AndroidAuth, ios_auth_key := IOSAuth,
+%%  android_reg_package_name := AndroidPackageName, ios_bundle_id := IOSBundleId,
   expires := Expires, expires_conn := ExpiresConn})  ->
   case ExpiresConn =< epoch(0) of
     true ->
       ssl:close(Socket),
       handle_cast(Query, State#{socket => undefined});
     false ->
-      {Auth, NewQuery} = get_auth_and_query(MsgType, AndroidAuth, IOSAuth, AndroidPackageName, IOSBundleId, Query),
-      Msg = joint_req(Method, NewQuery, Auth, Host),
+      Msg = joint_req(Method, Query, Auth, Host),
       case ssl:send(Socket, Msg) of
         ok ->
           {noreply, State#{expires_conn => epoch(Expires)}};
@@ -171,10 +169,10 @@ build_request(Path, QueryParameters) ->
 %% INTERNAL FUNCTION
 %% ===================================================================
 
-get_auth_and_query(ios, _AndroidAuth, IOSAuth, _AndroidPackageName, IOSBundleId, Query) ->
-  {IOSAuth, Query ++ "&restricted_package_name=" ++ IOSBundleId};
-get_auth_and_query(android, AndroidAuth, _IOSAuth, AndroidPackageName, _IOSBundleId, Query) ->
-  {AndroidAuth, Query ++ "&restricted_package_name=" ++ AndroidPackageName}.
+%%get_auth_and_query(ios, _AndroidAuth, IOSAuth, _AndroidPackageName, IOSBundleId, Query) ->
+%%  {IOSAuth, Query ++ "&restricted_package_name=" ++ IOSBundleId};
+%%get_auth_and_query(android, AndroidAuth, _IOSAuth, AndroidPackageName, _IOSBundleId, Query) ->
+%%  {AndroidAuth, Query ++ "&restricted_package_name=" ++ AndroidPackageName}.
 
 joint_req(Method, Query, Auth, Host) ->
   [Method, " ", Query, " ", "HTTP/1.1", "\r\n",
