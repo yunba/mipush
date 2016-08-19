@@ -9,8 +9,11 @@
 
 ```erlang
 
-       PushMsg = #{payload => <<"">>,
-           regestricted_package_name => "app.package_name",
+       PushMsg = #{
+           type => android,
+           auth => "your_APIKey",
+           restricted_package_name => "app.package_name",
+           payload => <<"">>,
            pass_through => 0,
            title => <<"小米App"/utf8>>,
            description => <<"测试描述"/utf8>>,
@@ -24,8 +27,7 @@
          },
        RegID1 = "your_regid_base64",
        RegID2 = "your_regid_base64",
-       APIKey = "your_APIKey",
-      {ok, Pid} = mipush:connect(#{auth_key => APIKey, name => push_one_msg_test}),
+      {ok, Pid} = mipush:connect(#{host => "api.xmpush.xiaomi.com"}),
       R1 = mipush:push_to_regid(Pid, [RegID1, RegID2], Push, return),
       mipush:disconnect(Pid).
 
